@@ -84,6 +84,108 @@ namespace BigMansStuff.NAudio.FLAC
         public static extern StreamDecoderState FLAC__stream_decoder_get_state(IntPtr context);
 
         // Callbacks
+		/// Return values for the FLAC__StreamDecoder read callback.
+		public enum StreamDecoderReadStatus 
+		{
+			/// <summary>
+			/// The read was OK and decoding can continue.
+			/// </summary>
+			ReadStatusContinue,
+			/// <summary>
+			/// The read was attempted while at the end of the stream.  Note that
+			//	the client must only return this value when the read callback was
+			//	called when already at the end of the stream.  Otherwise, if the read
+			//	itself moves to the end of the stream, the client should still return
+			//	the data and ReadStatusContinue, and then on
+			//	the next read callback it should return
+			//	ReadStatusEndOfStream with a byte count
+			//	of 0.
+			/// </summary>
+			ReadStatusEndOfStream,
+			/// <summary>
+			/// The read status abort.
+			/// </summary>
+			ReadStatusAbort
+		};
+
+		/// Return values for the FLAC__StreamDecoder seek callback.
+		public enum StreamDecoderSeekStatus 
+		{
+			/// <summary>
+			/// The seek was OK and decoding can continue.
+			/// </summary>
+			SeekStatusOk,
+			/// <summary>
+			/// An unrecoverable error occurred.  The decoder will return from the process call.
+			/// </summary>
+			SeekStatusError,
+			/// <summary>
+			///  Client does not support seeking.
+			/// </summary>
+			SeekStatusUnsupported
+		};
+
+		/// Return values for the FLAC__StreamDecoder tell callback.
+		public enum StreamDecoderTellStatus
+		{
+			/// <summary>
+			/// The tell was OK and decoding can continue.
+			/// </summary>
+			TellStatusOK,
+			/// <summary>
+			/// An unrecoverable error occurred.  The decoder will return from the process call.
+			/// </summary>
+			TellStatusError,
+			/// <summary>
+			/// Client does not support telling the position
+			/// </summary>
+			TellStatusUnsupported
+		};
+
+		/// Return values for the FLAC__StreamDecoder length callback.
+		public enum StreamDecoderLengthStatus
+		{
+			/// <summary>
+			/// The length call was OK and decoding can continue.
+			/// </summary>
+			LengthStatusOk,
+			/// <summary>
+			/// An unrecoverable error occurred.  The decoder will return from the process call.
+			/// </summary>
+			LengthStatusError,
+			/// <summary>
+			/// Client does not support reporting the length.
+			/// </summary>
+			LengthStatusUnsupported
+		};
+
+		[DllImport(DLLName, CallingConvention = CallingConvention.Cdecl)]
+		public static extern int FLAC__stream_decoder_init_stream (IntPtr context,
+			Decoder_ReadCallback read_callback,
+			DecoderSeekCallback seek_callback,
+			DecoderTellCallback tell_callback,
+			DecoderLengthCallback length_callback,
+			DecoderEofCallback eof_callback,
+			Decoder_WriteCallback write_callback,
+			Decoder_MetadataCallback metadata_callback,
+			Decoder_ErrorCallback error_callback,
+			IntPtr client_data);
+
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+		public delegate StreamDecoderReadStatus Decoder_ReadCallback(IntPtr context, IntPtr buffer, ref IntPtr bytes, IntPtr userData);
+
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+		public delegate StreamDecoderSeekStatus DecoderSeekCallback(IntPtr context, UInt64 absolute_byte_offset, IntPtr userData);
+
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+		public delegate StreamDecoderTellStatus DecoderTellCallback(IntPtr context, UInt64 absolute_byte_offset, IntPtr userData);
+
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+		public delegate StreamDecoderLengthStatus DecoderLengthCallback(IntPtr context, ref UInt64 stream_length, IntPtr userData);
+
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+		public delegate int DecoderEofCallback(IntPtr context, IntPtr userData);
+
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void Decoder_WriteCallback(IntPtr context, IntPtr frame, IntPtr buffer, IntPtr userData);
 

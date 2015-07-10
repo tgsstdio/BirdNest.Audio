@@ -43,6 +43,7 @@ namespace BigMansStuff.NAudio.FLAC
         /// <summary>Constructor - Supports opening a FLAC file</summary>
         public FLACFileReader(string flacFileName)
         {
+			m_decoderContext = IntPtr.Zero;
             Console.WriteLine("FLACFileReader: " + flacFileName);
             // Open the flac file for reading through a binary reader
             //m_stream = File.OpenRead(flacFileName);
@@ -160,9 +161,7 @@ namespace BigMansStuff.NAudio.FLAC
             while (flacBytesCopied < numBytes)
             {
                 // Read the next PCM bytes from the FLAC File into the sample buffer
-                FLACCheck(
-                        LibFLACSharp.FLAC__stream_decoder_process_single(m_decoderContext),
-                        "process single");
+				ProcessSingle ();
                 decoderState = LibFLACSharp.FLAC__stream_decoder_get_state(m_decoderContext);
                 if (decoderState == LibFLACSharp.StreamDecoderState.EndOfStream)
                     break;
@@ -173,6 +172,12 @@ namespace BigMansStuff.NAudio.FLAC
             return flacBytesCopied;
         }
 
+
+		void ProcessSingle ()
+		{
+			//FLACCheck (LibFLACSharp.FLAC__stream_decoder_process_single (m_decoderContext), "process single");
+			LibFLACSharp.FLAC__stream_decoder_process_single (m_decoderContext);
+		}
         #endregion
 
         #region Private Methods
@@ -330,7 +335,8 @@ namespace BigMansStuff.NAudio.FLAC
         /// <param name="userData"></param>
         private void FLAC_ErrorCallback(IntPtr context, LibFLACSharp.DecodeError status, IntPtr userData)
         {
-            throw new ApplicationException(string.Format("FLAC: Could not decode frame: {0}!", status));
+			var decoderState = LibFLACSharp.FLAC__stream_decoder_get_state(m_decoderContext);
+			throw new ApplicationException(string.Format("FLAC: Could not decode frame: {0} - {1}!", status, decoderState));
         }
 
         #endregion

@@ -20,10 +20,14 @@ namespace OpenALDemo
 
 				using (var stream = new FLACFileReader("01_Ghosts_I.flac"))
 				{
-					int MAX_BUFFER = (int) stream.Length;
+					int MAX_BUFFER = 8800;
 					byte[] soundData = new byte[MAX_BUFFER];
 
-					stream.Read (soundData, 0, MAX_BUFFER);
+					int count = 0;
+					while (stream.Read (soundData, 0, MAX_BUFFER) > 0)
+					{
+						++count;
+					}
 					
 					int buffer = AL.GenBuffer ();
 					AL.BufferData(buffer, stream.WaveFormat.sound_format, soundData, MAX_BUFFER, stream.WaveFormat.sampleRate);
