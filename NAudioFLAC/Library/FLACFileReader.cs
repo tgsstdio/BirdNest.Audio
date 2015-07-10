@@ -25,7 +25,6 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Diagnostics;
-using NAudio.Wave;
 using System.Runtime.InteropServices;
 
 namespace BigMansStuff.NAudio.FLAC
@@ -37,7 +36,7 @@ namespace BigMansStuff.NAudio.FLAC
     /// Written By Yuval Naveh, based a .NET/C# Interop wrapper by Stanimir Stoyanov - http://stoyanoff.info/blog/2010/07/26/decoding-flac-audio-files-in-c/
     /// using libFlac - http://flac.sourceforge.net
     /// </remarks>
-    public class FLACFileReader : WaveStream
+	public class FLACFileReader : Stream
     {
         #region Constructors
 
@@ -46,8 +45,8 @@ namespace BigMansStuff.NAudio.FLAC
         {
             Console.WriteLine("FLACFileReader: " + flacFileName);
             // Open the flac file for reading through a binary reader
-            m_stream = File.OpenRead(flacFileName);
-            m_reader = new BinaryReader(m_stream);
+            //m_stream = File.OpenRead(flacFileName);
+            //m_reader = new BinaryReader(m_stream);
             // Create the FLAC decoder
             m_decoderContext = LibFLACSharp.FLAC__stream_decoder_new();
 
@@ -71,7 +70,7 @@ namespace BigMansStuff.NAudio.FLAC
                 "Could not process until end of metadata");
 
             // Initialize NAudio wave format
-            m_waveFormat = new WaveFormat(m_flacStreamInfo.SampleRate, m_flacStreamInfo.BitsPerSample, m_flacStreamInfo.Channels);
+			m_waveFormat = new WaveInformation(m_flacStreamInfo.SampleRate, m_flacStreamInfo.BitsPerSample, m_flacStreamInfo.Channels);
 
             Console.WriteLine("Total FLAC Samples: {0}", LibFLACSharp.FLAC__stream_decoder_get_total_samples(m_decoderContext));
         }
@@ -97,7 +96,7 @@ namespace BigMansStuff.NAudio.FLAC
         /// <summary>
         /// <see cref="WaveStream.WaveFormat"/>
         /// </summary>
-        public override WaveFormat WaveFormat
+        public WaveInformation WaveFormat
         {
             get { return m_waveFormat; }
         }
@@ -185,8 +184,11 @@ namespace BigMansStuff.NAudio.FLAC
         /// <param name="operation"></param>
         private void FLACCheck(bool result, string operation)
         {
-            if (!result)
-                throw new ApplicationException(string.Format("FLAC: Could not {0}!", operation));
+			if (!result)
+			{
+				var decoderState = LibFLACSharp.FLAC__stream_decoder_get_state(m_decoderContext);
+				throw new ApplicationException (string.Format ("FLAC: Could not {0} - {1}!", operation, decoderState));
+			}
         }
 
         /// <summary>
@@ -355,18 +357,18 @@ namespace BigMansStuff.NAudio.FLAC
                     m_decoderContext = IntPtr.Zero;
                 }
 
-                if (m_stream != null)
-                {
-                    m_stream.Close();
-                    m_stream.Dispose();
-                    m_stream = null;
-                }
-
-                if (m_reader != null)
-                {
-                    m_reader.Close();
-                    m_reader = null;
-                }
+//                if (m_stream != null)
+//                {
+//                    m_stream.Close();
+//                    m_stream.Dispose();
+//                    m_stream = null;
+//                }
+//
+//                if (m_reader != null)
+//                {
+//                    m_reader.Close();
+//                    m_reader = null;
+//                }
             }
             base.Dispose(disposing);
         }
@@ -375,12 +377,12 @@ namespace BigMansStuff.NAudio.FLAC
 
         #region Private Members
 
-        private WaveFormat m_waveFormat;
+        private WaveInformation m_waveFormat;
         private object m_repositionLock = new object();
 
         private IntPtr m_decoderContext;
-        private Stream m_stream;
-        private BinaryReader m_reader;
+        //private Stream m_stream;
+        //private BinaryReader m_reader;
 
         private LibFLACSharp.FLACStreamInfo m_flacStreamInfo;
         private int m_samplesPerChannel;
@@ -401,5 +403,47 @@ namespace BigMansStuff.NAudio.FLAC
         private LibFLACSharp.Decoder_MetadataCallback m_metadataCallback;
         private LibFLACSharp.Decoder_ErrorCallback m_errorCallback;
         #endregion
+
+		#region implemented abstract members of Stream
+
+		public override void Flush ()
+		{
+			throw new NotImplementedException ();
+		}
+
+		public override long Seek (long offset, SeekOrigin origin)
+		{
+			throw new NotImplementedException ();
+		}
+
+		public override void SetLength (long value)
+		{
+			throw new NotImplementedException ();
+		}
+
+		public override void Write (byte[] buffer, int offset, int count)
+		{
+			throw new NotImplementedException ();
+		}
+
+		public override bool CanRead {
+			get {
+				throw new NotImplementedException ();
+			}
+		}
+
+		public override bool CanSeek {
+			get {
+				throw new NotImplementedException ();
+			}
+		}
+
+		public override bool CanWrite {
+			get {
+				throw new NotImplementedException ();
+			}
+		}
+
+		#endregion
     }
 }
