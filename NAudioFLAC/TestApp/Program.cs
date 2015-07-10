@@ -11,7 +11,7 @@ namespace BigMansStuff.NAudio.FLAC
             IWavePlayer waveOutDevice;
             WaveStream mainOutputStream;
             // 16 bit FLAC
-            string fileName = @"Spark2.flac";
+			string fileName = @"01_Ghosts_I.flac";
             // 24 bit FLAC
             //string fileName = @"PASC183_24test.flac"; 
 
