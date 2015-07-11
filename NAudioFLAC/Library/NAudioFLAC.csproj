@@ -61,6 +61,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="FLACFileReader.cs" />
     <Compile Include="WaveInformation.cs" />
+    <Compile Include="FLACStream.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />
