@@ -1,66 +1,75 @@
 ﻿using System;
 using System.IO;
 using OpenTK.Audio.OpenAL;
+using System.Runtime.InteropServices;
 
-namespace SharpAL
+namespace BigMansStuff.NAudio.FLAC
 {
 	public class FLACStream : Stream
 	{
 		const int NUM_BUFFERS = 4;
 
-		uint[] buffers = new uint[NUM_BUFFERS];  // Buffers to queue our data into
-		uint source;            				  // Our source's identifier for OpenAL
-		ALFormat format;                	// A simple OpenAL-usable format description
+		private int[] buffers;  // Buffers to queue our data into
+		private int source;            				  // Our source's identifier for OpenAL
+		public ALFormat Format;                	// A simple OpenAL-usable format description
 
 		//#define OPENAL_BUFFER_SIZE 65536 // 65536 bytes = 64KB
-		const int  OPENAL_BUFFER_SIZE  = 16384;
+		private const int  OPENAL_BUFFER_SIZE  = 16384;
 
-		public bool m_bStreaming; // Are we in streaming mode, or should we preload the data?
-		public bool m_bFinished;  // Are we finished playing this sound? Can we delete this?
-		public bool m_bLooping;   // Is this sample in a constant looping state?
-		public bool m_bReady;     // Are we ready to play this file?
-		public bool m_bRequiresSync; // If this is true, we syncronize with the engine.
-		public bool m_bPositional; // Are we placed in a world position?
-		public bool m_bPersistent; // Do not delete this sample automatically, used for pointers that are stored
+		public bool IsStreaming; // Are we in streaming mode, or should we preload the data?
+		private bool mIsFinished;  // Are we finished playing this sound? Can we delete this?
+		public bool IsLooping;   // Is this sample in a constant looping state?
+		private bool mIsReady;     // Are we ready to play this file?
+		public bool RequiresSync; // If this is true, we syncronize with the engine.
+		public bool IsPositional; // Are we placed in a world position?
+		public bool IsPersistent; // Do not delete this sample automatically, used for pointers that are stored
 
-		public float[] m_fPosition = new float[3]; // Where is this sample source?
-		public float[] m_fVelocity = new float[3]; // In which velocity is our source playing?
-		public float m_fGain; // This is the gain of our sound
-		public float m_fFadeScalar; // The gain of our sound is multiplied by this
+		private float[] m_fPosition = new float[3]; // Where is this sample source?
+		private float[] m_fVelocity = new float[3]; // In which velocity is our source playing?
+		public float Gain; // This is the gain of our sound
+		public float FadeScalar; // The gain of our sound is multiplied by this
 
-		Stream flacFile;
+		private Stream mStream;
 
-		byte[] m_pWriteData;
-		byte[] m_pWriteDataEnd;
-		int size;
-		int sampleRate;
-		int sizeOfLast;
-		bool m_bHitEOF;
+		private byte[] mALStreamingBufferData;
+		private int[] mFLACChannelData_Mono_0; // for mono & stereo
+		private int[] mFLACChannelData_Stereo_1; // for stereo
+		private long mALCurrentWritePosition;
+		private long mALStreamingWriteUpperLimit;
+		private int mStreamingBufferSize;
+		private int sampleRate;
+		private int mSizeOfLastWrite;
+		private bool mHitEOFYet;
 
-		void DevMsg(string message)
+		private void Msg(string message)
 		{
 
 		}
 
-		void OPENAL_ERROR(ALError error)
+		private void DevMsg(string message)
 		{
 
 		}
 
-		void Warning(string message)
+		private void OPENAL_ERROR(ALError error)
 		{
 
 		}
 
-		void Update(float updateTime)
+		private void Warning(string message)
 		{
-			if (m_bFinished)
+
+		}
+
+		public void Update(float updateTime)
+		{
+			if (mIsFinished)
 			{
-				Destroy();
+				DestroyAL();
 				return;
 			}
 
-			if (!IsReady())
+			if (IsReady())
 			{
 				Warning("OpenAL: Sample update requested while not ready. Skipping Update.\n");
 				return;
@@ -75,10 +84,10 @@ namespace SharpAL
 
 			SubUpdate();
 
-			m_bRequiresSync = false;
+			RequiresSync = false;
 		}
 
-		void UpdateBuffers(float lastUpdate)
+		private void UpdateBuffers(float lastUpdate)
 		{
 			int state, processed;
 			bool active = false;
@@ -88,10 +97,10 @@ namespace SharpAL
 
 			while (processed-- > 0)
 			{
-				uint buffer = 0;
+				int[] buffer = new int[1];
 				ALError error;
 
-				AL.SourceUnqueueBuffers(source, 1, ref buffer);
+				AL.SourceUnqueueBuffers(source, 1, buffer);
 				error = AL.GetError();
 				if (error != ALError.NoError)
 				{
@@ -99,12 +108,12 @@ namespace SharpAL
 					OPENAL_ERROR(error);
 				}
 
-				active = CheckStream(buffer);
+				active = CheckStream(buffer[0]);
 
 				// I know that this block seems odd, but it's buffer overrun protection. Keep it here.
 				if (active)
 				{
-					AL.SourceQueueBuffers(source, 1, ref buffer);
+					AL.SourceQueueBuffers(source, 1, buffer);
 					error = AL.GetError();
 					if (error != ALError.NoError)
 					{
@@ -122,67 +131,67 @@ namespace SharpAL
 
 		void UpdatePositional(float lastUpdate)
 		{
-			if (!m_bRequiresSync && !m_pLinkedEntity) return;
-
-			float[] position = new float[3];
-			float[] velocity = new float[3];
-
-			if (m_pLinkedEntity )
-			{
-				/*
-		// TODO: Provide methods for better control of this position
-				position[0] = m_pLinkedEntity->GetAbsOrigin().x;
-				position[1] = m_pLinkedEntity->GetAbsOrigin().y;
-				position[2] = m_pLinkedEntity->GetAbsOrigin().y;
-
-				velocity[0] = m_pLinkedEntity->GetAbsVelocity().x;
-				velocity[1] = m_pLinkedEntity->GetAbsVelocity().y;
-				velocity[2] = m_pLinkedEntity->GetAbsVelocity().z;
-				*/
-
-				position[0] = m_pLinkedEntity->GetLocalOrigin().x;
-				position[1] = m_pLinkedEntity->GetLocalOrigin().y;
-				position[2] = m_pLinkedEntity->GetLocalOrigin().y;
-
-				velocity[0] = m_pLinkedEntity->GetLocalVelocity().x;
-				velocity[1] = m_pLinkedEntity->GetLocalVelocity().y;
-				velocity[2] = m_pLinkedEntity->GetLocalVelocity().z;
-			}
-			else
-			{
-				if (m_bPositional)
-				{
-					position[0] = m_fPosition[0];
-					position[1] = m_fPosition[1];
-					position[2] = m_fPosition[2];
-
-					velocity[0] = m_fVelocity[0];
-					velocity[1] = m_fVelocity[1];
-					velocity[2] = m_fVelocity[2];
-				}
-				else
-				{
-					position[0] = 0.0f;
-					position[1] = 0.0f;
-					position[2] = 0.0f;
-
-					velocity[0] = 0.0f;
-					velocity[1] = 0.0f;
-					velocity[2] = 0.0f;
-				}
-			}
-
-			// alSource3f(source, AL_POSITION, VALVEUNITS_TO_METERS(position[0]), VALVEUNITS_TO_METERS(position[1]), VALVEUNITS_TO_METERS(position[2]));
-			AL.Source(source, ALSource3f.Position, position[0], position[1], position[2]);
-			if (AL.GetError() !=  ALError.NoError)
-				Warning("OpenAL: Couldn't update a source's position.\n");
-
-			// alSource3f(source, AL_VELOCITY, VALVEUNITS_TO_METERS(velocity[0]), VALVEUNITS_TO_METERS(velocity[1]), VALVEUNITS_TO_METERS(velocity[2]));
-			AL.Source(source, ALSource3f.Velocity, velocity[0], velocity[1], velocity[2]);
-			if (AL.GetError() != ALError.NoError)
-				Warning("OpenAL: Couldn't update a source's velocity.\n");
-
-			AL.Source(source, ALSourcef.Gain, m_fGain * m_fFadeScalar);
+//			if (!m_bRequiresSync && !m_pLinkedEntity) return;
+//
+//			float[] position = new float[3];
+//			float[] velocity = new float[3];
+//
+//			if (m_pLinkedEntity )
+//			{
+//				/*
+//		// TODO: Provide methods for better control of this position
+//				position[0] = m_pLinkedEntity->GetAbsOrigin().x;
+//				position[1] = m_pLinkedEntity->GetAbsOrigin().y;
+//				position[2] = m_pLinkedEntity->GetAbsOrigin().y;
+//
+//				velocity[0] = m_pLinkedEntity->GetAbsVelocity().x;
+//				velocity[1] = m_pLinkedEntity->GetAbsVelocity().y;
+//				velocity[2] = m_pLinkedEntity->GetAbsVelocity().z;
+//				*/
+//
+//				position[0] = m_pLinkedEntity->GetLocalOrigin().x;
+//				position[1] = m_pLinkedEntity->GetLocalOrigin().y;
+//				position[2] = m_pLinkedEntity->GetLocalOrigin().y;
+//
+//				velocity[0] = m_pLinkedEntity->GetLocalVelocity().x;
+//				velocity[1] = m_pLinkedEntity->GetLocalVelocity().y;
+//				velocity[2] = m_pLinkedEntity->GetLocalVelocity().z;
+//			}
+//			else
+//			{
+//				if (m_bPositional)
+//				{
+//					position[0] = m_fPosition[0];
+//					position[1] = m_fPosition[1];
+//					position[2] = m_fPosition[2];
+//
+//					velocity[0] = m_fVelocity[0];
+//					velocity[1] = m_fVelocity[1];
+//					velocity[2] = m_fVelocity[2];
+//				}
+//				else
+//				{
+//					position[0] = 0.0f;
+//					position[1] = 0.0f;
+//					position[2] = 0.0f;
+//
+//					velocity[0] = 0.0f;
+//					velocity[1] = 0.0f;
+//					velocity[2] = 0.0f;
+//				}
+//			}
+//
+//			// alSource3f(source, AL_POSITION, VALVEUNITS_TO_METERS(position[0]), VALVEUNITS_TO_METERS(position[1]), VALVEUNITS_TO_METERS(position[2]));
+//			AL.Source(source, ALSource3f.Position, position[0], position[1], position[2]);
+//			if (AL.GetError() !=  ALError.NoError)
+//				Warning("OpenAL: Couldn't update a source's position.\n");
+//
+//			// alSource3f(source, AL_VELOCITY, VALVEUNITS_TO_METERS(velocity[0]), VALVEUNITS_TO_METERS(velocity[1]), VALVEUNITS_TO_METERS(velocity[2]));
+//			AL.Source(source, ALSource3f.Velocity, velocity[0], velocity[1], velocity[2]);
+//			if (AL.GetError() != ALError.NoError)
+//				Warning("OpenAL: Couldn't update a source's velocity.\n");
+//
+//			AL.Source(source, ALSourcef.Gain, m_fGain * m_fFadeScalar);
 		}
 
 		/***
@@ -267,14 +276,14 @@ namespace SharpAL
 		/***
 		//* Checks whether or not this sample is currently ready to be played.
 		// 		***/
-		bool IsReady()
+		public bool IsReady()
 		{
-			return m_bReady && !m_bFinished;
+			return mIsReady && !mIsFinished;
 		}
 
 		bool IsFinished()
 		{
-			if (m_bFinished)
+			if (mIsFinished)
 			{
 				float seconds_played;
 				AL.GetSource(source, ALSourcef.SecOffset, out seconds_played);
@@ -293,11 +302,6 @@ namespace SharpAL
 			return false;
 		}
 
-		bool IsPositional()
-		{
-			return m_bPositional;
-		}
-
 		//		/***
 		//		 * Methods for updating the source's position/velocity/etc
 		//		 ***/
@@ -314,11 +318,11 @@ namespace SharpAL
 				return;
 			}
 
-			m_bPositional = positional;
+			IsPositional = positional;
 			ALError error;
-			if (m_bPositional)
+			if (IsPositional)
 			{
-				m_bRequiresSync = true;
+				RequiresSync = true;
 				AL.Source(source, ALSourceb.SourceRelative, false);
 				AL.Source(source, ALSourcef.RolloffFactor, BASE_ROLLOFF_FACTOR * 200);
 
@@ -342,7 +346,7 @@ namespace SharpAL
 				}
 			}
 
-			m_bRequiresSync = true;
+			RequiresSync = true;
 		}
 
 		void SetPosition(float x, float y, float z)
@@ -351,7 +355,7 @@ namespace SharpAL
 			m_fPosition[1] = y;
 			m_fPosition[2] = z;
 
-			m_bRequiresSync = true;
+			RequiresSync = true;
 		}
 
 		void SetPosition(float[] position)
@@ -360,7 +364,7 @@ namespace SharpAL
 			m_fPosition[1] = position[1];
 			m_fPosition[2] = position[2];
 
-			m_bRequiresSync = true;
+			RequiresSync = true;
 		}
 
 		void SetVelocity(float[] velocity)
@@ -369,10 +373,10 @@ namespace SharpAL
 			m_fVelocity[1] = velocity[1];
 			m_fVelocity[2] = velocity[2];
 
-			m_bRequiresSync = true;
+			RequiresSync = true;
 		}
 
-		void SetGain(float newGain) { m_fGain = newGain; }
+		void SetGain(float newGain) { Gain = newGain; }
 
 		//		/*
 		//        NOTE: All samples that do not call Persist() will be automatically deleted
@@ -380,19 +384,15 @@ namespace SharpAL
 		//        sample that you plan on storing to prevent this from happening.
 		//    	*/
 		void Persist() {
-			m_bPersistent = true; 
-		}
-
-		bool IsPersistent() { 
-			return m_bPersistent; 
+			IsPersistent = true; 
 		}
 
 		void SetLooping(bool shouldLoop)
 		{
-			m_bLooping = shouldLoop;
+			IsLooping = shouldLoop;
 		}
 
-		void ClearBuffers()
+		private void ClearBuffers()
 		{
 			if (IsPlaying())
 			{
@@ -410,13 +410,12 @@ namespace SharpAL
 			}
 		}
 
-
 		/***
  		* Keep those buffers flowing.
  		***/
-		void BufferData(uint bufferID, ALFormat format, IntPtr data, int size, int freq)
+		private void BufferData(int bufferID, byte[] data, int size, int freq)
 		{
-			AL.BufferData(bufferID, format, data, size, freq);
+			AL.BufferData<byte>(bufferID, Format, data, size, freq);
 			var error = AL.GetError();
 			if ( error != ALError.NoError)
 			{
@@ -451,18 +450,18 @@ namespace SharpAL
 
 		public FLACStream (Stream stream)
 		{
-			flacFile = stream;
+			mStream = stream;
 
-			m_bStreaming = false;
-			m_bFinished = false;
-			m_bLooping = false;
-			m_bReady = false;
-			m_bRequiresSync = true;
-			m_bPositional = false;
-			m_bPersistent = false;
+			IsStreaming = false;
+			mIsFinished = false;
+			IsLooping = false;
+			mIsReady = false;
+			RequiresSync = true;
+			IsPositional = false;
+			IsPersistent = false;
 
-			m_fGain = 1.0f;
-			m_fFadeScalar = 1.0f;
+			Gain = 1.0f;
+			FadeScalar = 1.0f;
 
 			m_fPosition[0] = 0.0f;
 			m_fPosition[1] = 0.0f;
@@ -475,137 +474,177 @@ namespace SharpAL
 			//
 			//			m_pLinkedEntity = NULL;
 
-			m_pWriteData = null;
-			m_pWriteDataEnd = null;
-			size = 0;
+			mALStreamingBufferData = null;
+			mALCurrentWritePosition = 0;
+			mALStreamingWriteUpperLimit = 0;
+			mStreamingBufferSize = 0;
 			sampleRate = 0;
-			sizeOfLast = 0;
-			m_bHitEOF = false;			
+			mSizeOfLastWrite = 0;
+			mHitEOFYet = false;			
 		}
 
-		bool CheckStream(uint buffer)
+		/// <summary>
+		/// Helper utility function - Checks the result of a libFlac function by throwing an exception if the result was false
+		/// </summary>
+		/// <param name="result"></param>
+		/// <param name="operation"></param>
+		private void FLACCheck(bool result, string operation)
+		{
+			if (!result)
+			{
+				var decoderState = LibFLACSharp.FLAC__stream_decoder_get_state(mDecoderContext);
+				throw new ApplicationException (string.Format ("FLAC: Could not {0} - {1}!", operation, decoderState));
+			}
+		}
+
+		private bool CheckStream(int buffer)
 		{
 			if ( !IsReady() ) return false;
 
-			char[] data = new char[OPENAL_BUFFER_SIZE];
-			size = 0;
+			byte[] data = new byte[OPENAL_BUFFER_SIZE];
+			mStreamingBufferSize = 0;
 
-			m_pWriteData = data;
-			m_pWriteDataEnd = m_pWriteData + OPENAL_BUFFER_SIZE;
+			mALStreamingBufferData = data;
+			mALCurrentWritePosition = 0;
+			mALStreamingWriteUpperLimit = OPENAL_BUFFER_SIZE;
 
-			while ( size < OPENAL_BUFFER_SIZE )
+			while ( mStreamingBufferSize < OPENAL_BUFFER_SIZE )
 			{
-				FLAC__StreamDecoderState state = FLAC::Decoder::Stream::get_state();
+				var state = LibFLACSharp.FLAC__stream_decoder_get_state(mDecoderContext);
 
-				if (state == FLAC__STREAM_DECODER_END_OF_STREAM)
+				if (state == LibFLACSharp.StreamDecoderState.EndOfStream)
 				{
-					if (m_bLooping)
+					if (IsLooping)
 					{
 						//FLAC::Decoder::Stream::flush();
 						//FLAC::Decoder::Stream::seek_absolute(0);
 
-						FLAC::Decoder::Stream::reset();
+						LibFLACSharp.FLAC__stream_decoder_reset (mDecoderContext);
 					}
 					else
 					{
-						m_bHitEOF = true;
+						mHitEOFYet = true;
 						break;
 					}
 				}
-				else if ( state >= FLAC__STREAM_DECODER_OGG_ERROR )
+				else if ( state >= LibFLACSharp.StreamDecoderState.OggError )
 				{
 					// Critical error occured
-					Warning("FLAC: Decoding returned with critical state: %s", FLAC__StreamDecoderStateString[state] );
+					Warning(string.Format("FLAC: Decoding returned with critical state: {0}", state) );
 					break;
 				}
 
-				if ( !FLAC::Decoder::Stream::process_single() )
-				{
-					Warning("FLAC: Processing of a single frame failed!\n");
-					break;
-				}
+				FLACCheck (LibFLACSharp.FLAC__stream_decoder_process_single (mDecoderContext), "process single");
 
 				// if we can't fit an additional frame into the buffer, quit
-				if (sizeOfLast > m_pWriteDataEnd-m_pWriteData )
+				if (mSizeOfLastWrite > mALStreamingWriteUpperLimit - mALCurrentWritePosition )
 				{
 					break;
 				}
 			}
 
-			if (m_bHitEOF)
+			if (mHitEOFYet)
 			{
-				m_bFinished = true;
+				mIsFinished = true;
 				return false;
 			}
 			else
 			{
-				BufferData(buffer, format, data, size, sampleRate);
+				BufferData(buffer, data, mStreamingBufferSize, sampleRate);
 			}
 
 			return true;
 		}
 
-		public void Open(string filename)
+		private IntPtr mDecoderContext;
+		public void Run()
 		{
-			char[] abspath = new char[MAX_PATH_LENGTH];
-
-			m_pWriteData = null;
-			m_pWriteDataEnd = null;
-			size = 0;
+			mALStreamingBufferData = null;
+			mALCurrentWritePosition = 0;
+			mALStreamingWriteUpperLimit = 0;
+			mStreamingBufferSize = 0;
 			sampleRate = 0;
-			sizeOfLast = 0;
-			m_bHitEOF = false;
+			mSizeOfLastWrite = 0;
+			mHitEOFYet = false;
 
-			if (!FLAC::Decoder::Stream::is_valid())
+			mDecoderContext = LibFLACSharp.FLAC__stream_decoder_new();
+			if (mDecoderContext == IntPtr.Zero)
 			{
-				FLAC__StreamDecoderState state = FLAC::Decoder::Stream::get_state();
-				Warning("FLAC: Unable to initialize: %s", FLAC__StreamDecoderStateString[state] );
-				return;
+				throw new ApplicationException("FLAC: Could not initialize stream decoder!");
 			}
 
-			// Gets an absolute path to the provided filename
-			g_OpenALGameSystem.GetSoundPath(filename, abspath, sizeof(abspath));
-
-			flacFile = filesystem->Open(abspath, "rb");
-
-			if (!flacFile)
-			{
-				Warning("FLAC: Could not open flac file: %s. Aborting.\n", filename);
-				return;
+			if (LibFLACSharp.FLAC__stream_decoder_init_stream(mDecoderContext,
+				this.ReadCallback,
+				this.SeekCallback,
+				this.TellCallback,
+				this.LengthCallback,
+				this.EOFCallback,
+				this.WriteCallback,
+				this.MetadataCallback,
+				this.ErrorCallback,
+				IntPtr.Zero) != 0)
+			{				
+				throw new ApplicationException("FLAC: Could not open stream for reading!");
 			}
 
-			FLAC__StreamDecoderInitStatus status = FLAC::Decoder::Stream::init();
+			mALStreamingBufferData = null;
+			mHitEOFYet = false;
 
-			if (status != FLAC__STREAM_DECODER_INIT_STATUS_OK)
-			{
-				filesystem->Close(flacFile);
-				Warning("FLAC: Critical stream decoder init status: %s", FLAC__StreamDecoderInitStatusString[status] );
-				return;
-			}
-
-			m_pWriteData = null;
-			m_bHitEOF = false;
-
-			m_bFinished = false; // Sample has just started, assume not finished
+			mIsFinished = false; // Sample has just started, assume not finished
 
 			InitAL();
 		}
 
-		public override void Close()
-		{
-			m_bReady = false;
-			m_bHitEOF = false;
-			ClearBuffers();
-			flacFile.Close ();
-			//filesystem->Close(flacFile);
+		#region Dispose
 
-			if ( !FLAC::Decoder::Stream::finish() )
-				Warning("FLAC; Memory allocation error on stream finish!\n");
+		/// <summary>
+		/// Disposes this WaveStream
+		/// </summary>
+		protected override void Dispose(bool disposing)
+		{
+			// unmanaged memory
+			mIsReady = false;
+			mHitEOFYet = false;
+			ClearBuffers();
+			mStream.Close ();
+			DestroyAL ();
+
+			if (disposing)
+			{
+				if (mDecoderContext != IntPtr.Zero)
+				{
+					FLACCheck(
+						LibFLACSharp.FLAC__stream_decoder_finish(mDecoderContext),
+						"finalize stream decoder");
+
+					FLACCheck(
+						LibFLACSharp.FLAC__stream_decoder_delete(mDecoderContext),
+						"dispose of stream decoder instance");
+
+					mDecoderContext = IntPtr.Zero;
+				}
+
+				//                if (m_stream != null)
+				//                {
+				//                    m_stream.Close();
+				//                    m_stream.Dispose();
+				//                    m_stream = null;
+				//                }
+				//
+				//                if (m_reader != null)
+				//                {
+				//                    m_reader.Close();
+				//                    m_reader = null;
+				//                }
+			}
+			base.Dispose(disposing);
 		}
 
-		void InitAL()
+		#endregion
+
+		private void InitAL()
 		{
-			AL.GenBuffers(NUM_BUFFERS, buffers);
+			buffers = AL.GenBuffers(NUM_BUFFERS);
 			ALError error = AL.GetError();
 			if ( error != ALError.NoError)
 			{
@@ -614,7 +653,7 @@ namespace SharpAL
 				return;
 			}
 
-			AL.GenSource(out source);
+			source = AL.GenSource();
 			error = AL.GetError();
 			if ( error != ALError.NoError)
 			{
@@ -623,25 +662,24 @@ namespace SharpAL
 				return;
 			}
 
-			AL.Source(source, ALSourcef.ReferenceDistance, valveUnitsPerMeter);
+			//AL.Source(source, ALSourcef.ReferenceDistance, valveUnitsPerMeter);
 			error = AL.GetError();
 			if ( error != ALError.NoError)
 			{
 				Warning("OpenAL: You need to update your audio drivers or OpenAL for sound to work properly.\n");
 			}
 
-			m_bReady = InitFormat();
-			g_OpenALGameSystem.Add(this);
+			mIsReady = InitFormat();
 		}
 
-		void Destroy()
+		private void DestroyAL()
 		{
-			m_bFinished = true; // Mark this for deleting and to be ignored by the thread.
+			mIsFinished = true; // Mark this for deleting and to be ignored by the thread.
 
 			Stop();
 			DestroyFormat();
 
-			AL.DeleteSource(ref source);
+			AL.DeleteSource(source);
 			ALError error = AL.GetError();
 			if ( error != ALError.NoError)
 			{
@@ -649,7 +687,7 @@ namespace SharpAL
 				OPENAL_ERROR(error);
 			}
 
-			AL.DeleteBuffers(NUM_BUFFERS, ref buffers);
+			AL.DeleteBuffers(buffers);
 			error = AL.GetError();
 			if ( error != ALError.NoError)
 			{
@@ -660,167 +698,276 @@ namespace SharpAL
 
 		#region Callbacks
 
-		FLAC__StreamDecoderReadStatus read_callback(FLAC__byte buffer[], size_t *bytes)
+		protected LibFLACSharp.StreamDecoderReadStatus ReadCallback(IntPtr context, IntPtr buffer, ref IntPtr bytes, IntPtr userData)
 		{
-			if(*bytes > 0) 
-			{
-				int size = filesystem->ReadEx(buffer, sizeof(FLAC__byte), *bytes, flacFile);
+			UInt64 noOfBytes = Convert.ToUInt64 (bytes);
 
-				if (size < 0)
+			if(noOfBytes > 0) 
+			{
+				int length = (noOfBytes < OPENAL_BUFFER_SIZE) ? (int)noOfBytes : OPENAL_BUFFER_SIZE;
+				byte[] streamChunk = new byte[length];
+				int chunkSize = mStream.Read (streamChunk, 0, length);
+				Marshal.Copy (streamChunk, 0, buffer, chunkSize);
+
+				if (chunkSize < 0)
 				{
-					m_bHitEOF = true;
-					return FLAC__STREAM_DECODER_READ_STATUS_ABORT;
+					mHitEOFYet = true;
+					return LibFLACSharp.StreamDecoderReadStatus.ReadStatusAbort;
 				}
-				else if (size == 0)
+				else if (chunkSize == 0)
 				{
-					m_bHitEOF = true;
-					return FLAC__STREAM_DECODER_READ_STATUS_END_OF_STREAM;
+					mHitEOFYet = true;
+					return LibFLACSharp.StreamDecoderReadStatus.ReadStatusEndOfStream;
 				}
 				else
 				{
-					return FLAC__STREAM_DECODER_READ_STATUS_CONTINUE;
+					bytes = (IntPtr) chunkSize;
+					return LibFLACSharp.StreamDecoderReadStatus.ReadStatusContinue;
+				}
+
+			}
+			else
+			{
+				mHitEOFYet = true;
+				return LibFLACSharp.StreamDecoderReadStatus.ReadStatusAbort;
+			}
+		}
+
+		protected LibFLACSharp.StreamDecoderSeekStatus SeekCallback(IntPtr context, UInt64 absoluteByteOffset, IntPtr userData)
+		{
+			if (mStream.CanSeek)
+			{
+				try
+				{
+					long offset = Convert.ToInt64(absoluteByteOffset);
+					mStream.Seek(offset, SeekOrigin.Begin);
+					return LibFLACSharp.StreamDecoderSeekStatus.SeekStatusOk;
+				} 
+				catch (NotImplementedException)
+				{
+					return LibFLACSharp.StreamDecoderSeekStatus.SeekStatusUnsupported;
+				} 
+				catch (Exception)
+				{
+					return LibFLACSharp.StreamDecoderSeekStatus.SeekStatusError;
 				}
 			}
 			else
 			{
-				m_bHitEOF = true;
-				return FLAC__STREAM_DECODER_READ_STATUS_ABORT;
+				return LibFLACSharp.StreamDecoderSeekStatus.SeekStatusUnsupported;
 			}
 		}
 
-		FLAC__StreamDecoderSeekStatus seek_callback(FLAC__uint64 absolute_byte_offset)
+		protected LibFLACSharp.StreamDecoderTellStatus TellCallback(IntPtr context, ref UInt64 absoluteByteOffset, IntPtr userData)
 		{
-			filesystem->Seek( flacFile, (off_t)absolute_byte_offset, FILESYSTEM_SEEK_HEAD );
-			return FLAC__STREAM_DECODER_SEEK_STATUS_OK;
-		}
-
-		FLAC__StreamDecoderTellStatus tell_callback(FLAC__uint64 *absolute_byte_offset)
-		{
-			int offset = filesystem->Tell( flacFile );
-			*absolute_byte_offset = (FLAC__uint64)offset;
-			return FLAC__STREAM_DECODER_TELL_STATUS_OK;
-		}
-
-		FLAC__StreamDecoderLengthStatus length_callback(FLAC__uint64 *stream_length)
-		{
-			int size = filesystem->Size( flacFile );
-			*stream_length = (FLAC__uint64)size;
-			return FLAC__STREAM_DECODER_LENGTH_STATUS_OK;
-		}
-
-		bool eof_callback()
-		{
-			bool hitEOF = filesystem->EndOfFile( flacFile );
-
-			if (hitEOF)
+			try
 			{
-				m_bHitEOF = true;
+				absoluteByteOffset = Convert.ToUInt64(mStream.Position);
+				return LibFLACSharp.StreamDecoderTellStatus.TellStatusOK;
 			}
-
-			return hitEOF;
+			catch(NotImplementedException)
+			{
+				return LibFLACSharp.StreamDecoderTellStatus.TellStatusUnsupported;
+			}
+			catch(Exception)
+			{
+				return LibFLACSharp.StreamDecoderTellStatus.TellStatusError;
+			}
 		}
 
-		FLAC__StreamDecoderWriteStatus write_callback(const ::FLAC__Frame *frame, const FLAC__int32 * const buffer[])
+		protected LibFLACSharp.StreamDecoderLengthStatus LengthCallback(IntPtr context, ref UInt64 streamLength, IntPtr userData)
 		{
-			register signed int sample0, sample1;
+			try
+			{
+				long length = mStream.Length;
+				streamLength = Convert.ToUInt64(length);
+				return LibFLACSharp.StreamDecoderLengthStatus.LengthStatusOk;
+			}
+			catch(NotImplementedException)
+			{
+				return LibFLACSharp.StreamDecoderLengthStatus.LengthStatusUnsupported;
+			}
+			catch(Exception)
+			{
+				return LibFLACSharp.StreamDecoderLengthStatus.LengthStatusError;
+			}
+		}
+
+		protected int EOFCallback(IntPtr context, IntPtr userData)
+		{	
+			return (mHitEOFYet) ? 1 : 0;
+
+//			if (mStream.Position >= mStream.Length)
+//			{
+//				m_bHitEOF = true;
+//				return 1;
+//			}
+//			else
+//			{
+//				return 0;
+//			}
+		}
+
+
+		private int m_samplesPerChannel;
+		/// <summary>
+		/// FLAC Write Call Back - libFlac notifies back on a frame that was read from the source file and written as a frame
+		/// </summary>
+		/// <param name="context"></param>
+		/// <param name="frame"></param>
+		/// <param name="buffer"></param>
+		/// <param name="clientData"></param>
+		protected LibFLACSharp.StreamDecoderWriteStatus WriteCallback(IntPtr context, IntPtr frame, IntPtr buffer, IntPtr clientData)
+		{
+			int leftChannel;
+			int rightChannel;
+
+			// Read the FLAC Frame into a memory samples buffer (m_flacSamples)
+			LibFLACSharp.FlacFrame flacFrame = (LibFLACSharp.FlacFrame)Marshal.PtrToStructure(frame, typeof(LibFLACSharp.FlacFrame));
 
 			// TODO: Write functions for handling 8-bit audio as well
-			if (frame->header.bits_per_sample != 16)
+			if (flacFrame.Header.BitsPerSample != 16)
 			{
-				Warning("FLAC: Unsupported bit-rate: %i", frame->header.bits_per_sample);
-				return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
+				Warning(string.Format("FLAC: Unsupported bit-rate: {0}", flacFrame.Header.BitsPerSample));
+				return LibFLACSharp.StreamDecoderWriteStatus.WriteStatusAbort;
+			}
+
+			m_samplesPerChannel = flacFrame.Header.BlockSize;
+			if (mFLACChannelData_Mono_0 == null)
+			{
+				// First time - Create Flac sample buffer
+				mFLACChannelData_Mono_0 = new int[m_samplesPerChannel];
+			}
+
+			if (mFLACChannelData_Stereo_1 == null)
+			{
+				// First time - Create Flac sample buffer
+				mFLACChannelData_Stereo_1 = new int[m_samplesPerChannel];
+			}
+
+			IntPtr pChannelBits = Marshal.ReadIntPtr(buffer, IntPtr.Size);
+			Marshal.Copy(pChannelBits, mFLACChannelData_Mono_0, 0, m_samplesPerChannel);
+
+			if (flacFrame.Header.Channels == 2)
+			{
+				IntPtr nextBits = Marshal.ReadIntPtr(buffer, 1 * IntPtr.Size);
+				Marshal.Copy(nextBits, mFLACChannelData_Stereo_1, 0, m_samplesPerChannel);
 			}
 
 			/* write decoded PCM samples */
-			if (frame->header.channels == 2)
+			if (flacFrame.Header.Channels == 2)
 			{
 				// Stereo
-				for(unsigned int i = 0; i < frame->header.blocksize; i++) 
+				for(uint i = 0; i < flacFrame.Header.BlockSize; i++) 
 				{
-					if (m_pWriteData != m_pWriteDataEnd)
+					if (mALCurrentWritePosition != mALStreamingWriteUpperLimit)
 					{
-						sample0 = buffer[0][i];
-						sample1 = buffer[1][i];
+						leftChannel = mFLACChannelData_Mono_0[i];
+						rightChannel = mFLACChannelData_Stereo_1[i];
 
-						m_pWriteData[0] = sample0 >> 0;
-						m_pWriteData[1] = sample0 >> 8;
+						mALStreamingBufferData[mALCurrentWritePosition] =  Convert.ToByte(leftChannel >> 0);
+						mALStreamingBufferData[mALCurrentWritePosition + 1] = Convert.ToByte(leftChannel >> 8);
 
-						m_pWriteData[2] = sample1 >> 0;
-						m_pWriteData[3] = sample1 >> 8;
+						mALStreamingBufferData[mALCurrentWritePosition + 2] = Convert.ToByte(rightChannel >> 0);
+						mALStreamingBufferData[mALCurrentWritePosition + 3] =  Convert.ToByte(rightChannel >> 8);
 
-						m_pWriteData += 4;
+						mALCurrentWritePosition += 4;
 					}
 					else
 					{
-						m_bHitEOF = true;
-						return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
+						mHitEOFYet = true;
+						return LibFLACSharp.StreamDecoderWriteStatus.WriteStatusAbort;
 					}
 				}
 
-				sizeOfLast = frame->header.blocksize * 2 * 2;   
-				size += sizeOfLast;
+				mSizeOfLastWrite = flacFrame.Header.BlockSize * 4;   
+				mStreamingBufferSize += mSizeOfLastWrite;
 			}
 			else
 			{
 				// Mono
-				for(unsigned int i = 0; i < frame->header.blocksize; i++) 
+				for(uint i = 0; i < flacFrame.Header.BlockSize; i++) 
 				{
-					if (m_pWriteData != m_pWriteDataEnd)
+					if (mALCurrentWritePosition != mALStreamingWriteUpperLimit)
 					{
-						sample0 = buffer[0][i];
+						leftChannel = mFLACChannelData_Mono_0[i];
 
-						m_pWriteData[0] = sample0 >> 0;
-						m_pWriteData[1] = sample0 >> 8;
+						mALStreamingBufferData[mALCurrentWritePosition] =  Convert.ToByte(leftChannel >> 0);
+						mALStreamingBufferData[mALCurrentWritePosition + 1] = Convert.ToByte(leftChannel >> 8);
 
-						m_pWriteData += 2;
+						mALCurrentWritePosition += 2;
 					}
 					else
 					{
-						m_bHitEOF = true;
-						return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
+						mHitEOFYet = true;
+						return LibFLACSharp.StreamDecoderWriteStatus.WriteStatusAbort;
 					}
 				}
 
-				sizeOfLast = frame->header.blocksize * 2;   
-				size += sizeOfLast;
+				mSizeOfLastWrite = flacFrame.Header.BlockSize * 2;
+				mStreamingBufferSize += mSizeOfLastWrite;
 			}
 
-			return FLAC__STREAM_DECODER_WRITE_STATUS_CONTINUE;
+			return LibFLACSharp.StreamDecoderWriteStatus.WriteStatusContinue;
 		}
 
-		void metadata_callback(const FLAC__StreamMetadata *metadata)
+		protected void MetadataCallback(IntPtr context, IntPtr metadata, IntPtr userData)
 		{
-			int bits = metadata->data.stream_info.bits_per_sample;
-			int channels = metadata->data.stream_info.channels;
-			sampleRate = metadata->data.stream_info.sample_rate;
+			LibFLACSharp.FLACMetaData flacMetaData = (LibFLACSharp.FLACMetaData) Marshal.PtrToStructure(metadata, typeof(LibFLACSharp.FLACMetaData));
 
-			if (bits == 16)
+			if (flacMetaData.MetaDataType == LibFLACSharp.FLACMetaDataType.StreamInfo)
 			{
-				format = channels == 2 ? AL_FORMAT_STEREO16 : AL_FORMAT_MONO16;
-			}
-			else if ( bits == 8 )
-			{
-				format = channels == 2 ? AL_FORMAT_STEREO8 : AL_FORMAT_MONO8;
-			}
-			else
-			{
-				Warning("FLAC: Unsupported sample bit size: %i\n", bits);
-			}
+				GCHandle pinnedStreamInfo = GCHandle.Alloc(flacMetaData.Data, GCHandleType.Pinned);
+				try
+				{
+					var streamInfo = (LibFLACSharp.FLACStreamInfo) Marshal.PtrToStructure(
+						pinnedStreamInfo.AddrOfPinnedObject(),
+						typeof(LibFLACSharp.FLACStreamInfo));
 
-			// Debug header
-			if (!m_bLooping)
-			{
-				Msg("FLAC: %i bits %s audio at %i\n",
-					bits,
-					channels == 2 ? "stereo" : "mono",
-					sampleRate);
+					int bits = streamInfo.BitsPerSample;
+					int channels = streamInfo.Channels;
+					sampleRate = streamInfo.SampleRate;
+
+					if (bits == 16)
+					{
+						Format = channels == 2 ? ALFormat.Stereo16 : ALFormat.Mono16;
+							}
+					else if ( bits == 8 )
+					{
+						Format = channels == 2 ? ALFormat.Stereo8 : ALFormat.Mono8;
+					}
+					else
+					{
+						Warning(string.Format("FLAC: Unsupported sample bit size: {0}\n", bits));
+					}
+
+					// Debug header
+					if (!IsLooping)
+					{
+						Msg(string.Format("FLAC: {0} bits {1} audio at {2}\n",
+							bits,
+							channels == 2 ? "stereo" : "mono",
+							sampleRate));
+					}
+				}
+				finally
+				{
+					pinnedStreamInfo.Free();
+				}
+
 			}
 		}
 
-		void error_callback(::FLAC__StreamDecoderErrorStatus status)
+		/// <summary>
+		/// FLAC Error Call Back - libFlac notifies about a decoding error
+		/// </summary>
+		/// <param name="context"></param>
+		/// <param name="status"></param>
+		/// <param name="userData"></param>
+		private void ErrorCallback(IntPtr context, LibFLACSharp.DecodeError status, IntPtr userData)
 		{
-			// All calls to this function is critical
-			Warning("FLAC: Got decoding error callback: %s\n", FLAC__StreamDecoderErrorStatusString[status]);
+			var decoderState = LibFLACSharp.FLAC__stream_decoder_get_state(mDecoderContext);
+			throw new ApplicationException(string.Format("FLAC: Could not decode frame: {0} - {1}!", status, decoderState));
 		}
 
 		#endregion
@@ -831,10 +978,12 @@ namespace SharpAL
 		{
 			throw new NotImplementedException ();
 		}
+
 		public override long Seek (long offset, SeekOrigin origin)
 		{
-			throw new NotImplementedException ();
+			return mStream.Seek (offset, origin);
 		}
+
 		public override void SetLength (long value)
 		{
 			throw new NotImplementedException ();
@@ -842,8 +991,9 @@ namespace SharpAL
 
 		public override int Read (byte[] buffer, int offset, int count)
 		{
-			throw new NotImplementedException ();
+			return mStream.Read (buffer, offset, count);
 		}
+
 		public override void Write (byte[] buffer, int offset, int count)
 		{
 			throw new NotImplementedException ();
@@ -856,7 +1006,7 @@ namespace SharpAL
 		}
 		public override bool CanSeek {
 			get {
-				throw new NotImplementedException ();
+				return mStream.CanSeek;
 			}
 		}
 		public override bool CanWrite {
@@ -866,12 +1016,12 @@ namespace SharpAL
 		}
 		public override long Length {
 			get {
-				throw new NotImplementedException ();
+				return mStream.Length;
 			}
 		}
 		public override long Position {
 			get {
-				throw new NotImplementedException ();
+				return mStream.Position;
 			}
 			set {
 				throw new NotImplementedException ();

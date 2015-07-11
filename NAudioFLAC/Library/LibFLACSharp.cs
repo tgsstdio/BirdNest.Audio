@@ -83,6 +83,9 @@ namespace BigMansStuff.NAudio.FLAC
         [DllImport(DLLName, CallingConvention = CallingConvention.Cdecl)]
         public static extern StreamDecoderState FLAC__stream_decoder_get_state(IntPtr context);
 
+		[DllImport(DLLName, CallingConvention = CallingConvention.Cdecl)]
+		public static extern int FLAC__stream_decoder_reset(IntPtr context);
+
         // Callbacks
 		/// Return values for the FLAC__StreamDecoder read callback.
 		public enum StreamDecoderReadStatus 
@@ -90,7 +93,7 @@ namespace BigMansStuff.NAudio.FLAC
 			/// <summary>
 			/// The read was OK and decoding can continue.
 			/// </summary>
-			ReadStatusContinue,
+			ReadStatusContinue = 0,
 			/// <summary>
 			/// The read was attempted while at the end of the stream.  Note that
 			//	the client must only return this value when the read callback was
@@ -114,7 +117,7 @@ namespace BigMansStuff.NAudio.FLAC
 			/// <summary>
 			/// The seek was OK and decoding can continue.
 			/// </summary>
-			SeekStatusOk,
+			SeekStatusOk = 0,
 			/// <summary>
 			/// An unrecoverable error occurred.  The decoder will return from the process call.
 			/// </summary>
@@ -148,7 +151,7 @@ namespace BigMansStuff.NAudio.FLAC
 			/// <summary>
 			/// The length call was OK and decoding can continue.
 			/// </summary>
-			LengthStatusOk,
+			LengthStatusOk = 0,
 			/// <summary>
 			/// An unrecoverable error occurred.  The decoder will return from the process call.
 			/// </summary>
@@ -159,32 +162,47 @@ namespace BigMansStuff.NAudio.FLAC
 			LengthStatusUnsupported
 		};
 
+		public enum StreamDecoderWriteStatus
+		{
+			/// <summary>
+			/// The write was OK and decoding can continue.
+			/// </summary>
+			WriteStatusContinue = 0,
+			/// <summary>
+			/// An unrecoverable error occurred.  The decoder will return from the process call.
+			/// </summary>
+			WriteStatusAbort
+		};
+
 		[DllImport(DLLName, CallingConvention = CallingConvention.Cdecl)]
 		public static extern int FLAC__stream_decoder_init_stream (IntPtr context,
-			Decoder_ReadCallback read_callback,
-			DecoderSeekCallback seek_callback,
-			DecoderTellCallback tell_callback,
-			DecoderLengthCallback length_callback,
-			DecoderEofCallback eof_callback,
-			Decoder_WriteCallback write_callback,
-			Decoder_MetadataCallback metadata_callback,
-			Decoder_ErrorCallback error_callback,
-			IntPtr client_data);
+			DecoderReadCallback readCallback,
+			DecoderSeekCallback seekCallback,
+			DecoderTellCallback tellCallback,
+			DecoderLengthCallback lengthCallback,
+			DecoderEofCallback eofCallback,
+			DecoderWriteCallbackWithStatus writeCallback,
+			Decoder_MetadataCallback metadataCallback,
+			Decoder_ErrorCallback errorCallback,
+			IntPtr clientData);
 
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-		public delegate StreamDecoderReadStatus Decoder_ReadCallback(IntPtr context, IntPtr buffer, ref IntPtr bytes, IntPtr userData);
+		public delegate StreamDecoderReadStatus DecoderReadCallback(IntPtr context, IntPtr buffer, ref IntPtr bytes, IntPtr userData);
 
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-		public delegate StreamDecoderSeekStatus DecoderSeekCallback(IntPtr context, UInt64 absolute_byte_offset, IntPtr userData);
+		public delegate StreamDecoderSeekStatus DecoderSeekCallback(IntPtr context, UInt64 absoluteByteOffset, IntPtr userData);
 
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-		public delegate StreamDecoderTellStatus DecoderTellCallback(IntPtr context, UInt64 absolute_byte_offset, IntPtr userData);
+		public delegate StreamDecoderTellStatus DecoderTellCallback(IntPtr context, ref UInt64 absoluteByteOffset, IntPtr userData);
 
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
-		public delegate StreamDecoderLengthStatus DecoderLengthCallback(IntPtr context, ref UInt64 stream_length, IntPtr userData);
+		public delegate StreamDecoderLengthStatus DecoderLengthCallback(IntPtr context, ref UInt64 streamLength, IntPtr userData);
 
 		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
 		public delegate int DecoderEofCallback(IntPtr context, IntPtr userData);
+
+		[UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+		public delegate StreamDecoderWriteStatus DecoderWriteCallbackWithStatus(IntPtr context, IntPtr frame, IntPtr buffer, IntPtr userData);
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         public delegate void Decoder_WriteCallback(IntPtr context, IntPtr frame, IntPtr buffer, IntPtr userData);
