@@ -5,6 +5,7 @@ using OpenTK.Audio.OpenAL;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
 using BigMansStuff.NAudio.FLAC;
+using System.IO;
 
 namespace OpenALDemo
 {
@@ -15,36 +16,12 @@ namespace OpenALDemo
 		{
 			using (var game = new GameWindow ())
 			using (var ac = new AudioContext ())
-			{
+			using (var fs = File.OpenRead("01_Ghosts_I.flac"))
+			using (var stream = new FLACStreamReader(fs, new SoundPacketQueue(), new FLACStreamReaderMessager()))					
+			{				
+				stream.ReadToEnd ();
+				//stream.Play ();
 				Console.WriteLine ("Hello World!");
-
-				using (var stream = new FLACFileReader("01_Ghosts_I.flac"))
-				{
-					int MAX_BUFFER = 8800;
-					byte[] soundData = new byte[MAX_BUFFER];
-
-					int count = 0;
-					while (stream.Read (soundData, 0, MAX_BUFFER) > 0)
-					{
-						++count;
-					}
-					
-					int buffer = AL.GenBuffer ();
-					AL.BufferData(buffer, stream.WaveFormat.sound_format, soundData, MAX_BUFFER, stream.WaveFormat.sampleRate);
-					ALError error_code = AL.GetError ();
-					if (error_code != ALError.NoError)
-					{
-						// respond to load error etc.
-						Console.WriteLine(error_code);
-					}
-
-					int source = AL.GenSource(); // gen 2 Source Handles
-
-					AL.Source( source, ALSourcei.Buffer, buffer ); // attach the buffer to a source
-
-					AL.SourcePlay(source); // start playback
-					AL.Source( source, ALSourceb.Looping, false ); // source loops infinitely
-				}
 
 				game.Load += (sender, e) =>
 				{
@@ -66,8 +43,8 @@ namespace OpenALDemo
 
 				game.UpdateFrame += (sender, e) =>
 				{
-
-				};
+					//stream.Update(1.0f / 60f);
+				};				
 
 				game.RenderFrame += (sender, e) =>
 				{
