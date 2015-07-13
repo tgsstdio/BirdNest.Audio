@@ -1,7 +1,7 @@
 ﻿using System;
 using OpenTK.Audio.OpenAL;
 
-namespace BigMansStuff.NAudio.FLAC
+namespace BirdNest.Audio
 {
 	public class WaveInformation
 	{

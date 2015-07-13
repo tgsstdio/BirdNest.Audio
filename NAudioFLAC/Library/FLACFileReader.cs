@@ -19,15 +19,16 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
+using LibFLACSharp;
+
+
 #endregion
 
 using System;
 using System.IO;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace BigMansStuff.NAudio.FLAC
+namespace BirdNest.Audio
 {
     /// <summary>
     /// NAudio reader for FLAC files
@@ -49,31 +50,31 @@ namespace BigMansStuff.NAudio.FLAC
             //m_stream = File.OpenRead(flacFileName);
             //m_reader = new BinaryReader(m_stream);
             // Create the FLAC decoder
-            m_decoderContext = LibFLACSharp.FLAC__stream_decoder_new();
+            m_decoderContext = LibFLAC.FLAC__stream_decoder_new();
 
             if (m_decoderContext == IntPtr.Zero)
                 throw new ApplicationException("FLAC: Could not initialize stream decoder!");
 
             // Create call back delegates
-            m_writeCallback = new LibFLACSharp.Decoder_WriteCallback(FLAC_WriteCallback);
-            m_metadataCallback = new LibFLACSharp.Decoder_MetadataCallback(FLAC_MetadataCallback);
-            m_errorCallback = new LibFLACSharp.Decoder_ErrorCallback(FLAC_ErrorCallback);
+            m_writeCallback = new LibFLAC.Decoder_WriteCallback(FLAC_WriteCallback);
+            m_metadataCallback = new LibFLAC.Decoder_MetadataCallback(FLAC_MetadataCallback);
+            m_errorCallback = new LibFLAC.Decoder_ErrorCallback(FLAC_ErrorCallback);
 
             // Initialize the FLAC decoder
-            if (LibFLACSharp.FLAC__stream_decoder_init_file(m_decoderContext,
+            if (LibFLAC.FLAC__stream_decoder_init_file(m_decoderContext,
                                                flacFileName, m_writeCallback, m_metadataCallback, m_errorCallback,
                                                IntPtr.Zero) != 0)
                 throw new ApplicationException("FLAC: Could not open stream for reading!");
 
             // Process the meta-data (but not the audio frames) so we can prepare the NAudio wave format
             FLACCheck(
-                LibFLACSharp.FLAC__stream_decoder_process_until_end_of_metadata(m_decoderContext),
+                LibFLAC.FLAC__stream_decoder_process_until_end_of_metadata(m_decoderContext),
                 "Could not process until end of metadata");
 
             // Initialize NAudio wave format
 			m_waveFormat = new WaveInformation(m_flacStreamInfo.SampleRate, m_flacStreamInfo.BitsPerSample, m_flacStreamInfo.Channels);
 
-            Console.WriteLine("Total FLAC Samples: {0}", LibFLACSharp.FLAC__stream_decoder_get_total_samples(m_decoderContext));
+            Console.WriteLine("Total FLAC Samples: {0}", LibFLAC.FLAC__stream_decoder_get_total_samples(m_decoderContext));
         }
 
         #endregion
@@ -156,14 +157,14 @@ namespace BigMansStuff.NAudio.FLAC
                     flacBytesCopied = CopyFlacBufferToNAudioBuffer();
                 }
             }
-            var decoderState = LibFLACSharp.FLAC__stream_decoder_get_state(m_decoderContext);
+            var decoderState = LibFLAC.FLAC__stream_decoder_get_state(m_decoderContext);
             // Keep reading flac packets until enough bytes have been copied
             while (flacBytesCopied < numBytes)
             {
                 // Read the next PCM bytes from the FLAC File into the sample buffer
 				ProcessSingle ();
-                decoderState = LibFLACSharp.FLAC__stream_decoder_get_state(m_decoderContext);
-                if (decoderState == LibFLACSharp.StreamDecoderState.EndOfStream)
+                decoderState = LibFLAC.FLAC__stream_decoder_get_state(m_decoderContext);
+                if (decoderState == LibFLAC.StreamDecoderState.EndOfStream)
                     break;
                 else
                     flacBytesCopied += CopyFlacBufferToNAudioBuffer();
@@ -175,8 +176,8 @@ namespace BigMansStuff.NAudio.FLAC
 
 		void ProcessSingle ()
 		{
-			//FLACCheck (LibFLACSharp.FLAC__stream_decoder_process_single (m_decoderContext), "process single");
-			LibFLACSharp.FLAC__stream_decoder_process_single (m_decoderContext);
+			//FLACCheck (LibFLAC.FLAC__stream_decoder_process_single (m_decoderContext), "process single");
+			LibFLAC.FLAC__stream_decoder_process_single (m_decoderContext);
 		}
         #endregion
 
@@ -191,7 +192,7 @@ namespace BigMansStuff.NAudio.FLAC
         {
 			if (!result)
 			{
-				var decoderState = LibFLACSharp.FLAC__stream_decoder_get_state(m_decoderContext);
+				var decoderState = LibFLAC.FLAC__stream_decoder_get_state(m_decoderContext);
 				throw new ApplicationException (string.Format ("FLAC: Could not {0} - {1}!", operation, decoderState));
 			}
         }
@@ -266,7 +267,7 @@ namespace BigMansStuff.NAudio.FLAC
         private void FLAC_WriteCallback(IntPtr context, IntPtr frame, IntPtr buffer, IntPtr clientData)
         {
             // Read the FLAC Frame into a memory samples buffer (m_flacSamples)
-            LibFLACSharp.FlacFrame flacFrame = (LibFLACSharp.FlacFrame)Marshal.PtrToStructure(frame, typeof(LibFLACSharp.FlacFrame));
+            LibFLAC.FlacFrame flacFrame = (LibFLAC.FlacFrame)Marshal.PtrToStructure(frame, typeof(LibFLAC.FlacFrame));
 
             if (m_flacSamples == null)
             {
@@ -294,7 +295,7 @@ namespace BigMansStuff.NAudio.FLAC
                 if (m_repositionRequested)
                 {
                     m_repositionRequested = false;
-                    FLACCheck(LibFLACSharp.FLAC__stream_decoder_seek_absolute(m_decoderContext, m_flacReposition), "Could not seek absolute: " + m_flacReposition);
+                    FLACCheck(LibFLAC.FLAC__stream_decoder_seek_absolute(m_decoderContext, m_flacReposition), "Could not seek absolute: " + m_flacReposition);
                 }
             }
         }
@@ -308,16 +309,16 @@ namespace BigMansStuff.NAudio.FLAC
         /// <param name="userData"></param>
         private void FLAC_MetadataCallback(IntPtr context, IntPtr metadata, IntPtr userData)
         {
-            LibFLACSharp.FLACMetaData flacMetaData = (LibFLACSharp.FLACMetaData)Marshal.PtrToStructure(metadata, typeof(LibFLACSharp.FLACMetaData));
+            LibFLAC.FLACMetaData flacMetaData = (LibFLAC.FLACMetaData)Marshal.PtrToStructure(metadata, typeof(LibFLAC.FLACMetaData));
 
-            if (flacMetaData.MetaDataType == LibFLACSharp.FLACMetaDataType.StreamInfo)
+            if (flacMetaData.MetaDataType == LibFLAC.FLACMetaDataType.StreamInfo)
             {
                 GCHandle pinnedStreamInfo = GCHandle.Alloc(flacMetaData.Data, GCHandleType.Pinned);
                 try
                 {
-                    m_flacStreamInfo = (LibFLACSharp.FLACStreamInfo)Marshal.PtrToStructure(
+                    m_flacStreamInfo = (LibFLAC.FLACStreamInfo)Marshal.PtrToStructure(
                         pinnedStreamInfo.AddrOfPinnedObject(),
-                        typeof(LibFLACSharp.FLACStreamInfo));
+                        typeof(LibFLAC.FLACStreamInfo));
                     m_totalSamples = (long)(m_flacStreamInfo.TotalSamplesHi << 32) + (long)m_flacStreamInfo.TotalSamplesLo;
                 }
                 finally
@@ -333,9 +334,9 @@ namespace BigMansStuff.NAudio.FLAC
         /// <param name="context"></param>
         /// <param name="status"></param>
         /// <param name="userData"></param>
-        private void FLAC_ErrorCallback(IntPtr context, LibFLACSharp.DecodeError status, IntPtr userData)
+        private void FLAC_ErrorCallback(IntPtr context, LibFLAC.DecodeError status, IntPtr userData)
         {
-			var decoderState = LibFLACSharp.FLAC__stream_decoder_get_state(m_decoderContext);
+			var decoderState = LibFLAC.FLAC__stream_decoder_get_state(m_decoderContext);
 			throw new ApplicationException(string.Format("FLAC: Could not decode frame: {0} - {1}!", status, decoderState));
         }
 
@@ -353,11 +354,11 @@ namespace BigMansStuff.NAudio.FLAC
                 if (m_decoderContext != IntPtr.Zero)
                 {
                     FLACCheck(
-                        LibFLACSharp.FLAC__stream_decoder_finish(m_decoderContext),
+                        LibFLAC.FLAC__stream_decoder_finish(m_decoderContext),
                         "finalize stream decoder");
 
                     FLACCheck(
-                        LibFLACSharp.FLAC__stream_decoder_delete(m_decoderContext),
+                        LibFLAC.FLAC__stream_decoder_delete(m_decoderContext),
                         "dispose of stream decoder instance");
 
                     m_decoderContext = IntPtr.Zero;
@@ -390,7 +391,7 @@ namespace BigMansStuff.NAudio.FLAC
         //private Stream m_stream;
         //private BinaryReader m_reader;
 
-        private LibFLACSharp.FLACStreamInfo m_flacStreamInfo;
+        private LibFLAC.FLACStreamInfo m_flacStreamInfo;
         private int m_samplesPerChannel;
         private long m_totalSamples = 0;
 
@@ -405,9 +406,9 @@ namespace BigMansStuff.NAudio.FLAC
         private bool m_repositionRequested = false;
         private long m_flacReposition = 0;
 
-        private LibFLACSharp.Decoder_WriteCallback m_writeCallback;
-        private LibFLACSharp.Decoder_MetadataCallback m_metadataCallback;
-        private LibFLACSharp.Decoder_ErrorCallback m_errorCallback;
+        private LibFLAC.Decoder_WriteCallback m_writeCallback;
+        private LibFLAC.Decoder_MetadataCallback m_metadataCallback;
+        private LibFLAC.Decoder_ErrorCallback m_errorCallback;
         #endregion
 
 		#region implemented abstract members of Stream

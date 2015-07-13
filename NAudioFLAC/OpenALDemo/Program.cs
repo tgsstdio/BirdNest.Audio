@@ -4,7 +4,7 @@ using OpenTK.Audio;
 using OpenTK.Audio.OpenAL;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
-using BigMansStuff.NAudio.FLAC;
+using BirdNest.Audio;
 using System.IO;
 
 namespace OpenALDemo
@@ -17,11 +17,32 @@ namespace OpenALDemo
 			using (var game = new GameWindow ())
 			using (var ac = new AudioContext ())
 			using (var fs = File.OpenRead("01_Ghosts_I.flac"))
-			using (var stream = new FLACStreamReader(fs, new SoundPacketQueue(), new FLACStreamReaderMessager()))					
+			using (var reader = new FLACDecoder(fs, new FLACPacketQueue(), new FLACDecoderLogger()))					
 			{				
-				stream.ReadToEnd ();
+				int totalBytesRead = 0;
+
+				const int MAX_BUFFER = 4096;
+				byte[] buffer = new byte[MAX_BUFFER];
+
+				Console.WriteLine ("Sample rate : {0}", reader.SampleRate);
+				bool isRunning = true;
+				while (isRunning)
+				{
+					var count = reader.Read(buffer, 0, MAX_BUFFER);
+					totalBytesRead += count;
+					if (count < MAX_BUFFER)
+					{
+						isRunning = false;
+					}
+
+					if (!isRunning)
+					{
+						reader.Dispose();
+					}
+				}
+
 				//stream.Play ();
-				Console.WriteLine ("Hello World!");
+				Console.WriteLine ("Total bytes loaded : {0} vs. {1}", totalBytesRead, reader.Length);
 
 				game.Load += (sender, e) =>
 				{

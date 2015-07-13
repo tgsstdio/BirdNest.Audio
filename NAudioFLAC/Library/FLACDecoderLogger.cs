@@ -1,8 +1,6 @@
-﻿using System;
-
-namespace BigMansStuff.NAudio.FLAC
+﻿namespace BirdNest.Audio
 {
-	public class FLACStreamReaderMessager : IFLACStreamReaderMessenger
+	public class FLACDecoderLogger : IFLACDecoderLogger
 	{
 		#region IFLACStreamReaderMessenger implementation
 
