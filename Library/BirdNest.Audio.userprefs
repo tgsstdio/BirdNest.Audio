@@ -1,0 +1,18 @@
+﻿<Properties StartupItem="OpenALDemo\04. OpenALDemo.csproj">
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug|x86" />
+  <MonoDevelop.Ide.Workbench ActiveDocument="OpenALDemo\Program.cs">
+    <Files>
+      <File FileName="OpenALDemo\Program.cs" Line="50" Column="22" />
+    </Files>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore>
+      <Breakpoint file="D:\Projects\TechDemos\NAudioFlac\NAudioFLAC\TestApp\Program.cs" line="11" column="38" />
+      <Breakpoint file="D:\Projects\TechDemos\NAudioFlac\NAudioFLAC\Library\FLACFileReader.cs" line="794" column="33" />
+      <Breakpoint file="D:\Projects\TechDemos\NAudioFlac\NAudioFLAC\OpenALDemo\Program.cs" line="144" column="10" />
+      <Breakpoint file="D:\Projects\TechDemos\NAudioFlac\NAudioFLAC\Library\FLACStreamReader.cs" line="98" column="43" />
+      <Breakpoint file="D:\Projects\TechDemos\NAudioFlac\NAudioFLAC\BirdNest.Audio.UnitTests\ArrayPoolNode.cs" line="117" column="28" />
+    </BreakpointStore>
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+</Properties>
