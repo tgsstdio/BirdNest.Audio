@@ -194,7 +194,7 @@ namespace BirdNest.Audio.UnitTests
 			}
 			else
 			{
-				if (low.Length >= Highest)
+				if (low.Length >= root.Highest)
 				{
 					left = new ArrayPoolNode<byte> ();
 

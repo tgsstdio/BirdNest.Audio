@@ -1,7 +1,6 @@
 ﻿using System;
 using OpenTK;
 using OpenTK.Audio;
-using OpenTK.Audio.OpenAL;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
 using BirdNest.Audio;
@@ -9,6 +8,12 @@ using System.IO;
 
 namespace OpenALDemo
 {
+	/// <summary>
+	/// Main class.
+	/// Sample file "01_Ghosts_I.flac" [Nine Inch Nails presents Ghosts I - IV]
+	/// is available for under Creative Commons for non-commercial use (http://creativecommons.org/licenses/by-nc-sa/3.0/us/)
+	/// See https://archive.org/details/nineinchnails_ghosts_I_IV
+	/// </summary>
 	class MainClass
 	{
 		[STAThread]
@@ -17,7 +22,7 @@ namespace OpenALDemo
 			using (var game = new GameWindow ())
 			using (var ac = new AudioContext ())
 			using (var fs = File.OpenRead("01_Ghosts_I.flac"))
-			using (var reader = new FLACDecoder(fs, new FLACPacketQueue(), new FLACDecoderLogger()))					
+			using (var reader = new FLACDecoder(fs, new FLACPacketQueue(), new EmptyStubLogger()))					
 			{				
 				int totalBytesRead = 0;
 
@@ -25,6 +30,7 @@ namespace OpenALDemo
 				byte[] buffer = new byte[MAX_BUFFER];
 
 				Console.WriteLine ("Sample rate : {0}", reader.SampleRate);
+				Console.WriteLine ("Duration : {0}", reader.Duration);
 				bool isRunning = true;
 				while (isRunning)
 				{

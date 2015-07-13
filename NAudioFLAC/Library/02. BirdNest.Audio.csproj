@@ -59,15 +59,12 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="FLACFileReader.cs" />
-    <Compile Include="WaveInformation.cs" />
-    <Compile Include="StreamingPlayer.cs" />
     <Compile Include="FLACPacket.cs" />
     <Compile Include="FLACPacketQueue.cs" />
     <Compile Include="FLACDecoder.cs" />
     <Compile Include="IFLACDecoderLogger.cs" />
-    <Compile Include="FLACDecoderLogger.cs" />
     <Compile Include="IFLACPacketQueue.cs" />
+    <Compile Include="EmptyStubLogger.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -91,9 +88,9 @@
   </Target>
   -->
   <ItemGroup>
-    <ProjectReference Include="..\LibFLACSharp\LibFLACSharp.csproj">
+    <ProjectReference Include="..\LibFLACSharp\01. LibFLACSharp.csproj">
       <Project>{EBE05AC6-9623-48F9-9231-8E4105FD369C}</Project>
-      <Name>LibFLACSharp</Name>
+      <Name>01. LibFLACSharp</Name>
     </ProjectReference>
   </ItemGroup>
 </Project>

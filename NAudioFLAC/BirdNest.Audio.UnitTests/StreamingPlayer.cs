@@ -1,7 +1,7 @@
 ﻿using System;
 using OpenTK.Audio.OpenAL;
 
-namespace BirdNest.Audio
+namespace BirdNest.Audio.UnitTests
 {
 	public class StreamingPlayer
 	{

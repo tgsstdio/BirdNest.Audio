@@ -1,8 +1,9 @@
 ﻿********************************************************************************
 
-The license for the NAudioFLAC assembly and classes other than libFlac is MIT:
+The license for the NAudioFLAC/LibFLACSharp interface assembly and classes other than libFlac is MIT:
 
 Copyright (c) 2010, Yuval Naveh
+Additional changes made by David Young (2015)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

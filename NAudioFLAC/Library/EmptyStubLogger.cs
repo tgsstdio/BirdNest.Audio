@@ -1,6 +1,6 @@
 ﻿namespace BirdNest.Audio
 {
-	public class FLACDecoderLogger : IFLACDecoderLogger
+	public class EmptyStubLogger : IFLACDecoderLogger
 	{
 		#region IFLACStreamReaderMessenger implementation
 

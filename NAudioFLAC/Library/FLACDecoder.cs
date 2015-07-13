@@ -6,6 +6,11 @@ using LibFLACSharp;
 
 namespace BirdNest.Audio
 {
+	/// <summary>
+	/// FLAC decoder.
+	/// Based on BigMansStuff.NAudio.FLAC.FLACReader (2010) by 
+	/// 
+	/// </summary>
 	public class FLACDecoder : Stream
 	{
 		private Stream mStream;
@@ -422,6 +427,7 @@ namespace BirdNest.Audio
 		public int Channels { get; private set; }
 		public int SampleRate {get; private set;}
 		public int BitsPerSample { get; private set; }
+		public TimeSpan Duration { get; private set; }
 		protected void MetadataCallback(IntPtr context, IntPtr metadata, IntPtr userData)
 		{
 			LibFLAC.FLACMetaData flacMetaData = (LibFLAC.FLACMetaData) Marshal.PtrToStructure(metadata, typeof(LibFLAC.FLACMetaData));
@@ -442,6 +448,8 @@ namespace BirdNest.Audio
 					mBlockAlign = (this.Channels * (BitsPerSample / 8));
 					mTotalSamples = (long)(streamInfo.TotalSamplesHi << 32) + (long)streamInfo.TotalSamplesLo;
 					mFLACLength = mBlockAlign * mTotalSamples;
+
+					Duration = TimeSpan.FromSeconds ((double)mTotalSamples / (double) SampleRate );
 
 					if (this.BitsPerSample == 16)
 					{
@@ -521,6 +529,7 @@ namespace BirdNest.Audio
 				return LibFLAC.StreamDecoderWriteStatus.WriteStatusAbort;
 			}
 
+			// TODO : POSSIBLE OPTIMIZATION - FLACPacket object pool
 			var packet = new FLACPacket ();
 			packet.Channels = flacFrame.Header.Channels;
 			//packet.Format = this.Format;
@@ -536,6 +545,7 @@ namespace BirdNest.Audio
 				// Stereo				
 				CopyRawFLACBufferData (buffer, 1, ref mFLACChannelData_Stereo_1, packet.BlockSize);
 
+				// TODO : POSSIBLE OPTIMIZATION - byte[] object pool
 				packet.Data = new byte[4 * packet.BlockSize];
 				uint writePosition = 0;
 
@@ -553,6 +563,7 @@ namespace BirdNest.Audio
 			}
 			else
 			{
+				// TODO : POSSIBLE OPTIMIZATION - byte[] object pool
 				packet.Data = new byte[2 * packet.BlockSize];
 				uint writePosition = 0;
 
