@@ -5,6 +5,7 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
 using BirdNest.Audio;
 using System.IO;
+using OpenTK.Audio.OpenAL;
 
 namespace OpenALDemo
 {
@@ -21,34 +22,54 @@ namespace OpenALDemo
 		{
 			using (var game = new GameWindow ())
 			using (var ac = new AudioContext ())
-			using (var fs = File.OpenRead("01_Ghosts_I.flac"))
-			using (var reader = new FLACDecoder(fs, new FLACPacketQueue(), new EmptyStubLogger()))					
 			{				
-				int totalBytesRead = 0;
-
-				const int MAX_BUFFER = 4096;
-				byte[] buffer = new byte[MAX_BUFFER];
-
-				Console.WriteLine ("Sample rate : {0}", reader.SampleRate);
-				Console.WriteLine ("Duration : {0}", reader.Duration);
-				bool isRunning = true;
-				while (isRunning)
+				using (var fs = File.OpenRead ("01_Ghosts_I.flac"))
+				using (var reader = new FLACDecoder (fs, new FLACPacketQueue (), new EmptyStubLogger ()))
+				using (var ms = new MemoryStream())
 				{
-					var count = reader.Read(buffer, 0, MAX_BUFFER);
-					totalBytesRead += count;
-					if (count < MAX_BUFFER)
+					Console.WriteLine ("Sample rate : {0}", reader.SampleRate);
+					Console.WriteLine ("Duration : {0}", reader.Duration);
+
+					reader.CopyTo (ms);
+
+					byte[] sound_data = ms.ToArray ();
+
+					int buffer = AL.GenBuffer ();
+					AL.BufferData(buffer, reader.Format, sound_data, sound_data.Length, reader.SampleRate);
+					ALError error_code = AL.GetError ();
+					if (error_code != ALError.NoError)
 					{
-						isRunning = false;
+						// respond to load error etc.
+						Console.WriteLine(error_code);
 					}
 
-					if (!isRunning)
+					int source = AL.GenSource(); // gen 2 Source Handles
+
+					AL.Source( source, ALSourcei.Buffer, buffer ); // attach the buffer to a source
+					error_code = AL.GetError ();
+					if (error_code != ALError.NoError)
 					{
-						reader.Dispose();
+						// respond to load error etc.
+						Console.WriteLine(error_code);
+					}
+
+
+					AL.SourcePlay(source); // start playback
+					error_code = AL.GetError ();
+					if (error_code != ALError.NoError)
+					{
+						// respond to load error etc.
+						Console.WriteLine(error_code);
+					}
+
+					AL.Source( source, ALSourceb.Looping, false ); // source loops infinitely
+					error_code = AL.GetError ();
+					if (error_code != ALError.NoError)
+					{
+						// respond to load error etc.
+						Console.WriteLine(error_code);
 					}
 				}
-
-				//stream.Play ();
-				Console.WriteLine ("Total bytes loaded : {0} vs. {1}", totalBytesRead, reader.Length);
 
 				game.Load += (sender, e) =>
 				{

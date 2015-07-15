@@ -2,7 +2,8 @@
   <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug|x86" />
   <MonoDevelop.Ide.Workbench ActiveDocument="OpenALDemo\Program.cs">
     <Files>
-      <File FileName="OpenALDemo\Program.cs" Line="50" Column="22" />
+      <File FileName="OpenALDemo\Program.cs" Line="35" Column="1" />
+      <File FileName="BirdNest.Audio\FLACDecoder.cs" Line="123" Column="3" />
     </Files>
   </MonoDevelop.Ide.Workbench>
   <MonoDevelop.Ide.DebuggingService.Breakpoints>
@@ -12,6 +13,7 @@
       <Breakpoint file="D:\Projects\TechDemos\NAudioFlac\NAudioFLAC\OpenALDemo\Program.cs" line="144" column="10" />
       <Breakpoint file="D:\Projects\TechDemos\NAudioFlac\NAudioFLAC\Library\FLACStreamReader.cs" line="98" column="43" />
       <Breakpoint file="D:\Projects\TechDemos\NAudioFlac\NAudioFLAC\BirdNest.Audio.UnitTests\ArrayPoolNode.cs" line="117" column="28" />
+      <Breakpoint file="D:\Projects\TechDemos\NAudioFlac\Library\OpenALDemo\Program.cs" line="35" column="35" />
     </BreakpointStore>
   </MonoDevelop.Ide.DebuggingService.Breakpoints>
   <MonoDevelop.Ide.DebuggingService.PinnedWatches />

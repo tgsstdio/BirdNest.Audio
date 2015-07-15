@@ -148,7 +148,7 @@ namespace BirdNest.Audio
 					if (bytesLeft > spaceRemaining)
 					{
 						// 1. copy current.data to buffer
-						Array.Copy (buffer, localOffset, current.Data, current.Offset, spaceRemaining);
+						Array.Copy (current.Data, current.Offset, buffer, localOffset, spaceRemaining);
 
 						// 2. adjust offset in current
 						current.Offset += spaceRemaining;
@@ -162,7 +162,7 @@ namespace BirdNest.Audio
 					else if (bytesLeft > 0 && bytesLeft <= spaceRemaining)
 					{
 						// 1. copy all data from buffer 
-						Array.Copy (buffer, localOffset, current.Data, current.Offset, bytesLeft);
+						Array.Copy (current.Data, current.Offset, buffer, localOffset, bytesLeft);
 
 						// 2. adjust local offset 
 						localOffset += bytesLeft;
